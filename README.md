@@ -33,9 +33,7 @@ cat: bar: Operation not permitted
 
 `noop` can be built from source with `cargo build`.
 
-Currently it relies on a personal fork of the `nix` crate to implement some missing features of `ptrace`. I have an [open PR](https://github.com/nix-rust/nix/pull/1010) so it hopefully will be included upstream in the next release.
-
-I highly doubt `noop` works on anything other than Linux.
+`noop` won't work on anything other than Linux.
 
 ## Alternatives
 

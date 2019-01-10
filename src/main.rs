@@ -19,18 +19,25 @@ const SYS_OPEN_BY_HANDLE_AT: u64 = 304;
 const SYS_EXIT: u64 = 60;
 const SYS_EXIT_GROUP: u64 = 231;
 
+/// Open mode to block
+enum OpenType {
+    Read,
+    Write,
+    All,
+}
+
 /// Action to take for a given file
 enum Action {
-    Block,
+    Block(OpenType),
     Replace(PathBuf),
 }
 
 /// Print usage message and exit
-fn usage() -> ! {
+fn usage(code: i32) -> ! {
     let msg = "noop blocks or modifies calls to open made by the passed program.
 
 USAGE:
-  noop [-lh] [FILE | FILE=REPLACE] -- PROGRAM [ARGS...]
+  noop [-lh] [FILE[:rw] | FILE=REPLACE]... -- PROGRAM [ARGS...]
 
 FLAGS:
   -l Logs open calls and resulting action to stderr
@@ -38,13 +45,14 @@ FLAGS:
 
 ARGS:
   FILE          Block PROGRAM from opening FILE
+      [:rw]     If :r or :w is specified only that opening mode is blocked
   FILE=REPLACE  Replace open calls to FILE with REPLACE
   PROGRAM       PROGRAM to run and intercept on
   ARGS          ARGS to pass to the PROGRAM
 ";
 
     eprintln!("{}", msg);
-    process::exit(0);
+    process::exit(code);
 }
 
 /// Wrapper for arugments passed to program
@@ -62,7 +70,7 @@ impl fmt::Debug for Args {
         for (path, action) in &self.paths {
             write!(f, "\t{:?} => ", path)?;
             match action {
-                Action::Block => writeln!(f, "BLOCK"),
+                Action::Block(_) => writeln!(f, "BLOCK"),
                 Action::Replace(p) => writeln!(f, "{:?}", p),
             }?;
         }
@@ -86,7 +94,7 @@ fn parse() -> Args {
 
         match arg.as_ref() {
             "-l" => show = true,
-            "-h" => usage(),
+            "-h" => usage(0),
             "--" => done_flags = true,
             _ => {
                 let parts: Vec<&str> = arg.split("=").collect();
@@ -100,7 +108,7 @@ fn parse() -> Args {
                     let replace = PathBuf::from(&parts[1]);
                     paths.insert(key, Action::Replace(replace));
                 } else {
-                    paths.insert(key, Action::Block);
+                    paths.insert(key, Action::Block(OpenType::All));
                 }
             }
         }
@@ -108,7 +116,7 @@ fn parse() -> Args {
 
     if argv.len() < 1 {
         eprintln!("No program to execute given");
-        process::exit(1);
+        usage(1);
     }
 
     Args { paths, show, argv }

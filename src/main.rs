@@ -37,7 +37,7 @@ fn usage(code: i32) -> ! {
     let msg = "noop blocks or modifies calls to open made by the passed program.
 
 USAGE:
-  noop [-lh] [FILE[:rw] | FILE=REPLACE]... -- PROGRAM [ARGS...]
+  noop [-lh] [FILE[:rw] | FILE=REPLACE]... -- PROGRAM [ARG]...
 
 FLAGS:
   -l Logs open calls and resulting action to stderr

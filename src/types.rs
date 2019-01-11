@@ -1,10 +1,12 @@
+//! Common types used across the crate, including file blocking data
+
 extern crate nix;
 use nix::libc::{O_RDWR, O_WRONLY};
 
 use std::fmt;
 use std::path::PathBuf;
 
-/// Open mode to block
+/// `open` mode to block
 #[derive(PartialEq, Debug)]
 pub enum OpenType {
     Read,
@@ -58,7 +60,7 @@ mod test {
     use super::*;
     use nix::libc::{O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, O_WRONLY};
 
-    /// Test standard OpenType parsing
+    /// Test standard `OpenType` parsing
     #[test]
     fn parse() {
         assert_eq!(OpenType::from(O_RDONLY), Read);
@@ -66,7 +68,7 @@ mod test {
         assert_eq!(OpenType::from(O_RDWR), All);
     }
 
-    /// Test optional open flags
+    /// Test optional `open` flags
     #[test]
     fn extra() {
         assert_eq!(OpenType::from(O_RDONLY | O_CREAT | O_TRUNC), Read);

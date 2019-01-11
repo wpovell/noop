@@ -1,3 +1,5 @@
+//! Code for intercepting and handling child process syscalls
+
 extern crate nix;
 use nix::errno::Errno;
 use nix::libc::user_regs_struct;
@@ -23,9 +25,9 @@ const SYS_OPEN_BY_HANDLE_AT: u64 = 304;
 const SYS_EXIT: u64 = 60;
 const SYS_EXIT_GROUP: u64 = 231;
 
-/// Parse child address holding a CString into a PathBuf
+/// Parse child address holding a `CString` into a `PathBuf`
 ///
-/// This function is marked unsafe as `addr` must be the address of a CString
+/// This function is marked unsafe as `addr` must be the address of a `CString`
 /// or behavior is undefined.
 unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
     let mut path: Vec<u8> = Vec::new();
@@ -54,10 +56,11 @@ unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Handle an open call.
+/// Checks if process can open file.
 ///
-/// Mutates registers and returns false if call is to be blocked
-fn handle_open(pid: Pid, syscall: u64, regs: &mut user_regs_struct, args: &Args) -> Result<bool> {
+/// Reads in path from child process and checks `open` mode against blocklist.
+fn check_open(pid: Pid, syscall: u64, regs: &mut user_regs_struct, args: &Args) -> Result<bool> {
+    // Syscall name, address to path, opening mode
     let (name, path_reg, flag_reg) = match syscall {
         SYS_OPEN => ("open", regs.rdi, regs.rsi),
         SYS_OPENAT => ("openat", regs.rsi, regs.rdx),
@@ -128,7 +131,7 @@ pub fn start(args: &Args) -> Result<()> {
         let allowed = match syscall {
             // Check if open is allowed
             SYS_OPEN | SYS_OPENAT | SYS_OPEN_BY_HANDLE_AT => {
-                handle_open(pid, syscall, &mut regs, &args)?
+                check_open(pid, syscall, &mut regs, &args)?
             }
             // Child exited, we will also
             SYS_EXIT | SYS_EXIT_GROUP => process::exit(regs.rdi as i32),

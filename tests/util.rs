@@ -1,9 +1,9 @@
 extern crate rand;
-use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 
-use std::{fs, panic, env};
 use std::process;
+use std::{env, fs, panic};
 
 #[cfg(debug_assertions)]
 static TARGET: &'static str = "target/debug/noop";
@@ -13,13 +13,11 @@ static TARGET: &'static str = "target/release/noop";
 
 /// Run test, passing it a temp file that is cleaned up after
 pub fn with_tempfile<T>(test: T) -> ()
-    where T: FnOnce(&str) -> () + panic::UnwindSafe
+where
+    T: FnOnce(&str) -> () + panic::UnwindSafe,
 {
     // Generate random name
-    let name: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(30)
-        .collect();
+    let name: String = thread_rng().sample_iter(&Alphanumeric).take(30).collect();
     let mut file = env::temp_dir();
     file.push(name);
     let file = file.to_str().unwrap();
@@ -28,9 +26,7 @@ pub fn with_tempfile<T>(test: T) -> ()
     let _ = fs::File::create(file);
 
     // Test
-    let result = panic::catch_unwind(|| {
-        test(&file)
-    });
+    let result = panic::catch_unwind(|| test(&file));
 
     // Delete
     let _ = fs::remove_file(file);
@@ -73,8 +69,5 @@ impl Output {
 
 /// Returns output wrapper for `TARGET` run with `args`
 pub fn output(args: &[&str]) -> Output {
-    Output::new(
-        process::Command::new(TARGET)
-            .args(args)
-            .output().unwrap())
+    Output::new(process::Command::new(TARGET).args(args).output().unwrap())
 }

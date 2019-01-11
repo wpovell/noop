@@ -1,3 +1,5 @@
+//! Command line argument parsing
+
 use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;
@@ -9,6 +11,7 @@ use std::process;
 use crate::err::{Error, Result};
 use crate::types::{Action, OpenType};
 
+/// Usage message shown by `-h`
 static USAGE: &'static str = "\
 noop blocks or modifies calls to open made by the passed program.
 
@@ -56,7 +59,7 @@ impl fmt::Debug for Args {
     }
 }
 
-/// Parse env::args into Args struct
+/// Parse `env::args` into `Args` struct
 pub fn parse(args: env::Args) -> Result<Args> {
     let mut paths: HashMap<PathBuf, Action> = HashMap::new();
 
@@ -84,15 +87,19 @@ pub fn parse(args: env::Args) -> Result<Args> {
 
                 let first = parts[0];
                 let (path, action) = if parts.len() == 2 {
+                    // Replace
                     let replace = PathBuf::from(&parts[1]);
                     (first, Action::Replace(replace))
                 } else if first.ends_with(":w") {
+                    // No write
                     let new = first.get(..first.len() - 2).unwrap();
                     (new, Action::Block(OpenType::Write))
                 } else if first.ends_with(":r") {
+                    // No read
                     let new = first.get(..first.len() - 2).unwrap();
                     (new, Action::Block(OpenType::Read))
                 } else {
+                    // No open
                     (first, Action::Block(OpenType::All))
                 };
 
@@ -103,7 +110,9 @@ pub fn parse(args: env::Args) -> Result<Args> {
     }
 
     if argv.is_empty() {
-        Err(Error::Arg { reason: "No program to execute given" })
+        Err(Error::Arg {
+            reason: "No program to execute given",
+        })
     } else {
         Ok(Args { paths, show, argv })
     }

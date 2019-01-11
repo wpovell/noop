@@ -1,3 +1,5 @@
+//! Main entrypoint to binary
+
 use std::env;
 
 mod args;

@@ -70,3 +70,5 @@ Applications that fork aren't handled.
 - Add file open redirection
 - Add recursive blocking
 - Add folder creation blocking
+- Add better command line argument handling
+- Use BPF to improve performance

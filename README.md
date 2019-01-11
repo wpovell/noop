@@ -30,10 +30,13 @@ ARGS:
 $ echo foo > bar
 $ cat bar
 foo
+$ # No oppen
 $ noop bar -- cat bar
 cat: bar: Operation not permitted
+$ # No read
 $ noop bar:r -- cat bar
 cat: bar: Operation not permitted
+$ # No write
 $ noop bar:w -- cat bar
 foo
 $ echo | noop bar:w -- tee bar

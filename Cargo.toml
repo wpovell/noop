@@ -6,6 +6,10 @@ edition = "2018"
 
 [dependencies]
 nix = { "git" = "https://github.com/nix-rust/nix", "rev" = "7f2ac636e9cf68d6836941b35ba0c4e9d43ae82f" }
+byteorder = "*"
+
+[profile.dev]
+debug = true
 
 [dev-dependencies]
 rand = "*"

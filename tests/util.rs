@@ -4,6 +4,7 @@ use rand::{thread_rng, Rng};
 
 use std::process;
 use std::{env, fs, panic};
+use std::io::Write;
 
 #[cfg(debug_assertions)]
 static TARGET: &'static str = "target/debug/noop";
@@ -11,7 +12,11 @@ static TARGET: &'static str = "target/debug/noop";
 #[cfg(not(debug_assertions))]
 static TARGET: &'static str = "target/release/noop";
 
+pub static TEST: &'static str = "DEADBEEF";
+
 /// Run test, passing it a temp file that is cleaned up after
+///
+/// Created file has the string "test" in it.
 pub fn with_tempfile<T>(test: T) -> ()
 where
     T: FnOnce(&str) -> () + panic::UnwindSafe,
@@ -23,7 +28,9 @@ where
     let file = file.to_str().unwrap();
 
     // Create
-    let _ = fs::File::create(file);
+    let mut f = fs::File::create(file).unwrap();
+    f.write(TEST.as_bytes()).unwrap();
+    drop(f);
 
     // Test
     let result = panic::catch_unwind(|| test(&file));
@@ -36,9 +43,9 @@ where
 
 /// Wrapper around process::Output that requires less unwrapping
 pub struct Output {
-    out: String,
-    err: String,
-    status: i32,
+    pub out: String,
+    pub err: String,
+    pub status: i32,
 }
 
 impl Output {

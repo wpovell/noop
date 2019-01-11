@@ -11,6 +11,29 @@ use std::process;
 use crate::err::{Error, Result};
 use crate::types::{Action, OpenType};
 
+/// Wrapper for arugments passed to program
+pub struct Args {
+    pub paths: HashMap<PathBuf, Action>,
+    pub show: bool,
+    pub argv: Vec<CString>,
+}
+
+impl fmt::Debug for Args {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "show: {}", self.show)?;
+        writeln!(f, "args: {:?}", self.argv)?;
+        writeln!(f, "paths:")?;
+        for (path, action) in &self.paths {
+            write!(f, "\t{:?} => ", path)?;
+            match action {
+                Action::Block(mode) => writeln!(f, "Block {}", mode),
+                Action::Replace(p) => writeln!(f, "{:?}", p),
+            }?;
+        }
+        Ok(())
+    }
+}
+
 /// Usage message shown by `-h`
 static USAGE: &'static str = "\
 noop blocks or modifies calls to open made by the passed program.
@@ -34,29 +57,6 @@ ARGS:
 pub fn usage(code: i32) -> ! {
     eprintln!("{}", USAGE);
     process::exit(code);
-}
-
-/// Wrapper for arugments passed to program
-pub struct Args {
-    pub paths: HashMap<PathBuf, Action>,
-    pub show: bool,
-    pub argv: Vec<CString>,
-}
-
-impl fmt::Debug for Args {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "show: {}", self.show)?;
-        writeln!(f, "args: {:?}", self.argv)?;
-        writeln!(f, "paths:")?;
-        for (path, action) in &self.paths {
-            write!(f, "\t{:?} => ", path)?;
-            match action {
-                Action::Block(mode) => writeln!(f, "Block {}", mode),
-                Action::Replace(p) => writeln!(f, "{:?}", p),
-            }?;
-        }
-        Ok(())
-    }
 }
 
 /// Parse `env::args` into `Args` struct

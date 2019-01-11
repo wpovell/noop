@@ -1,5 +1,5 @@
 mod util;
-use crate::util::{output, with_tempfile};
+use crate::util::*;
 
 /// Test that no output fails
 #[test]
@@ -30,6 +30,7 @@ fn no_write() {
         let block = &format!("{}:w", f);
         let o = output(&[block, "--", "cat", f]);
         assert!(o.pass());
+        assert!(o.contains(TEST));
 
         let o = output(&[block, "--", "tee", f]);
         assert!(o.fail());
@@ -43,6 +44,7 @@ fn no_read() {
         let block = &format!("{}:r", f);
         let o = output(&[block, "--", "cat", f]);
         assert!(o.fail());
+        assert!(!o.contains(TEST));
 
         let o = output(&[block, "--", "tee", f]);
         assert!(o.pass());
@@ -55,6 +57,7 @@ fn no_open() {
     with_tempfile(|f| {
         let o = output(&[f, "--", "cat", f]);
         assert!(o.fail());
+        assert!(!o.contains(TEST));
 
         let o = output(&[f, "--", "tee", f]);
         assert!(o.fail());
@@ -67,10 +70,29 @@ fn log() {
     with_tempfile(|f| {
         let o = output(&["-l", "--", "cat", f]);
         let s = format!("openat(\"{}\", R)", f);
+        assert!(o.pass());
         assert!(o.contains(&s));
+        assert!(o.contains(TEST));
 
         let o = output(&["-l", f, "--", "cat", f]);
         let s = format!("{} BLOCKED", s);
+        assert!(o.fail());
         assert!(o.contains(&s));
+        assert!(!o.contains(TEST));
+    });
+}
+
+/// Test that path redirection works
+#[test]
+fn redirect() {
+    with_tempfile(|f| {
+        let o = output(&["--", "cat", "bar"]);
+        assert!(o.fail());
+        assert!(!o.contains(TEST));
+
+        let r = &format!("bar={}", f);
+        let o = output(&[r, "--", "cat", "bar"]);
+        assert!(o.pass());
+        assert!(o.contains(TEST));
     });
 }

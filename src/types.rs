@@ -7,7 +7,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 /// `open` mode to block
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum OpenType {
     Read,
     Write,
@@ -48,7 +48,7 @@ impl From<i32> for OpenType {
 }
 
 /// Action to take for a given file
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action {
     Block(OpenType),
     Replace(PathBuf),

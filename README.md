@@ -30,7 +30,7 @@ ARGS:
 $ echo foo > bar
 $ cat bar
 foo
-$ # No oppen
+$ # No open
 $ noop bar -- cat bar
 cat: bar: Operation not permitted
 $ # No read

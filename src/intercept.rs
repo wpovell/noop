@@ -7,21 +7,26 @@ use nix::sys::wait::waitpid;
 use nix::unistd::{execvp, fork, ForkResult, Pid};
 
 use std::ffi::c_void;
+use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-use crate::args::{Action, Args};
+use crate::args::Args;
 use crate::err::Result;
+use crate::types::OpenType;
 
+// Syscall numbers
+// TODO: Would be nice to wrap these in an enum somehow
 const SYS_OPEN: u64 = 2;
 const SYS_OPENAT: u64 = 257;
 const SYS_OPEN_BY_HANDLE_AT: u64 = 304;
 const SYS_EXIT: u64 = 60;
 const SYS_EXIT_GROUP: u64 = 231;
 
-/// Parse pid address into a path
+/// Parse child address holding a CString into a PathBuf
 ///
 /// This function is marked unsafe as `addr` must be the address of a CString
+/// or behavior is undefined.
 unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
     let mut path: Vec<u8> = Vec::new();
     let mut loc = addr;
@@ -41,7 +46,12 @@ unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
         loc += std::mem::size_of::<i64>() as u64;
     }
     let path = std::str::from_utf8(&path)?;
-    Ok(PathBuf::from(path))
+    let path = match fs::canonicalize(path) {
+        Ok(pathbuf) => pathbuf,
+        Err(_) => PathBuf::from(path),
+    };
+
+    Ok(path)
 }
 
 /// Handle an open call.
@@ -55,27 +65,31 @@ fn handle_open(pid: Pid, syscall: u64, regs: &mut user_regs_struct, args: &Args)
         _ => panic!("Bad syscall passed to handle_open"),
     };
 
-    // Read path from child process
+    // Read path from child
     let path = unsafe { user_path(pid, path_reg)? };
+    // Parse open mode from flag register
+    let mode = OpenType::from(flag_reg);
 
-    let mut ret = true;
-    if let Some(Action::Block(_)) = args.paths.get(&path) {
-        // Set syscall to invalid value so it fails to open
-        regs.orig_rax = -1i64 as u64;
-        ptrace::setregs(pid, *regs)?;
-        ret = false;
+    let mut allowed = true;
+    if let Some(action) = args.paths.get(&path) {
+        use crate::types::Action::*;
+        allowed = match action {
+            Block(OpenType::All) => false,
+            Block(typ) => mode == OpenType::All || *typ != mode,
+            Replace(_) => unimplemented!(),
+        }
     }
 
     if args.show {
         // Print out open call
-        eprint!("{}({:?})", name, path);
-        if !ret {
+        eprint!("{}({:?}, {})", name, path, mode);
+        if !allowed {
             eprint!(" BLOCKED");
         }
         eprintln!();
     }
 
-    Ok(ret)
+    Ok(allowed)
 }
 
 /// Start child process and begin intercepting its calls to open
@@ -121,12 +135,18 @@ pub fn start(args: &Args) -> Result<()> {
             _ => true,
         };
 
+        if !allowed {
+            // Set syscall to invalid value so it fails to open
+            regs.orig_rax = -1i64 as u64;
+            ptrace::setregs(pid, regs)?;
+        }
+
         // Syscall exit
         ptrace::syscall(pid)?;
         waitpid(pid, None)?;
 
-        // Update return value if blocked
         if !allowed {
+            // Update return value to -EPERM
             regs.rax = (-(Errno::EPERM as i64)) as u64;
             ptrace::setregs(pid, regs)?;
         }

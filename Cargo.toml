@@ -5,4 +5,7 @@ authors = ["Will Povell <william_povell@brown.edu>"]
 edition = "2018"
 
 [dependencies]
-nix = { "git" = "https://github.com/nix-rust/nix" }
+nix = { "git" = "https://github.com/nix-rust/nix", "rev" = "7f2ac636e9cf68d6836941b35ba0c4e9d43ae82f" }
+
+[dev-dependencies]
+rand = "*"

@@ -7,23 +7,10 @@ use std::path::PathBuf;
 use std::process;
 
 use crate::err::{Error, Result};
+use crate::types::{Action, OpenType};
 
-/// Open mode to block
-pub enum OpenType {
-    Read,
-    Write,
-    All,
-}
-
-/// Action to take for a given file
-pub enum Action {
-    Block(OpenType),
-    Replace(PathBuf),
-}
-
-/// Print usage message and exit
-pub fn usage(code: i32) -> ! {
-    let msg = "noop blocks or modifies calls to open made by the passed program.
+static USAGE: &'static str = "\
+noop blocks or modifies calls to open made by the passed program.
 
 USAGE:
   noop [-lh] [FILE[:rw] | FILE=REPLACE]... -- PROGRAM [ARG]...
@@ -40,7 +27,9 @@ ARGS:
   ARGS          ARGS to pass to the PROGRAM
 ";
 
-    eprintln!("{}", msg);
+/// Print usage message and exit
+pub fn usage(code: i32) -> ! {
+    eprintln!("{}", USAGE);
     process::exit(code);
 }
 
@@ -59,7 +48,7 @@ impl fmt::Debug for Args {
         for (path, action) in &self.paths {
             write!(f, "\t{:?} => ", path)?;
             match action {
-                Action::Block(_) => writeln!(f, "BLOCK"),
+                Action::Block(mode) => writeln!(f, "Block {}", mode),
                 Action::Replace(p) => writeln!(f, "{:?}", p),
             }?;
         }
@@ -68,13 +57,13 @@ impl fmt::Debug for Args {
 }
 
 /// Parse env::args into Args struct
-pub fn parse() -> Result<Args> {
+pub fn parse(args: env::Args) -> Result<Args> {
     let mut paths: HashMap<PathBuf, Action> = HashMap::new();
 
     let mut done_flags = false;
     let mut show = false;
     let mut argv = Vec::new();
-    for arg in env::args().skip(1) {
+    for arg in args.skip(1) {
         if done_flags {
             let cstr = CString::new(arg)?;
             argv.push(cstr);
@@ -93,27 +82,36 @@ pub fn parse() -> Result<Args> {
                     });
                 }
 
-                let key = parse_path(&parts[0]);
-                if parts.len() == 2 {
+                let first = parts[0];
+                let (path, action) = if parts.len() == 2 {
                     let replace = PathBuf::from(&parts[1]);
-                    paths.insert(key, Action::Replace(replace));
+                    (first, Action::Replace(replace))
+                } else if first.ends_with(":w") {
+                    let new = first.get(..first.len() - 2).unwrap();
+                    (new, Action::Block(OpenType::Write))
+                } else if first.ends_with(":r") {
+                    let new = first.get(..first.len() - 2).unwrap();
+                    (new, Action::Block(OpenType::Read))
                 } else {
-                    paths.insert(key, Action::Block(OpenType::All));
-                }
+                    (first, Action::Block(OpenType::All))
+                };
+
+                let key = parse_path(&path);
+                paths.insert(key, action);
             }
         }
     }
 
     if argv.is_empty() {
-        Err(Error::Arg {
-            reason: "No program to execute given",
-        })
+        Err(Error::Arg { reason: "No program to execute given" })
     } else {
         Ok(Args { paths, show, argv })
     }
 }
 
 /// Parse name into canonicalize path if possible
+///
+/// Returns path unchanged if does not exist
 pub fn parse_path(name: &str) -> PathBuf {
     match fs::canonicalize(name) {
         Ok(full_path) => full_path,

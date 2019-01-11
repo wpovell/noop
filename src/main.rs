@@ -1,9 +1,12 @@
+use std::env;
+
 mod args;
 mod err;
 mod intercept;
+mod types;
 
 fn main() {
-    match args::parse() {
+    match args::parse(env::args()) {
         Err(e) => {
             eprintln!("Malformed arguments: {}\n", e);
             args::usage(1);

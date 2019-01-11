@@ -32,6 +32,12 @@ $ cat bar
 foo
 $ noop bar -- cat bar
 cat: bar: Operation not permitted
+$ noop bar:r -- cat bar
+cat: bar: Operation not permitted
+$ noop bar:w -- cat bar
+foo
+$ echo | noop bar:w -- tee bar
+tee: bar: Operation not permitted
 ```
 
 ## Building
@@ -52,7 +58,9 @@ Some alternative ways to block the opening of a file:
 
 ## Bugs
 
-Currently the command line parsing doesn't work very well on files with `=` or `:` in them.
+The command line parsing doesn't work very well on files with `=` or `:` in them.
+
+Applications that fork aren't handled.
 
 ## TODO
 

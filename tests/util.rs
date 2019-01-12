@@ -2,9 +2,9 @@ extern crate rand;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
+use std::io::Write;
 use std::process;
 use std::{env, fs, panic};
-use std::io::Write;
 
 #[cfg(debug_assertions)]
 static TARGET: &'static str = "target/debug/noop";

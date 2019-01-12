@@ -54,6 +54,18 @@ pub enum Action {
     Replace(PathBuf),
 }
 
+impl Action {
+    /// Checks if mode is allowed for action type
+    pub fn allows(&self, mode: &OpenType) -> bool {
+        match self {
+            Action::Block(OpenType::All) => false,
+            Action::Block(typ) =>
+                *mode == OpenType::All || *typ != *mode,
+            Action::Replace(_) => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::OpenType::*;

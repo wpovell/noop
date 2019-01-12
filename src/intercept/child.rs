@@ -58,6 +58,5 @@ pub fn write_data(pid: Pid, addr: u64, data: &mut Vec<u8>) -> Result<()> {
         loc += chunk_size as u64;
     }
 
-    eprintln!("{:?}", String::from_utf8_lossy(&read_data(pid, addr, None)?));
     Ok(())
 }

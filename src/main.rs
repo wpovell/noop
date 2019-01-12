@@ -5,7 +5,6 @@ use std::env;
 use std::process;
 
 mod args;
-mod child;
 mod err;
 mod intercept;
 mod types;

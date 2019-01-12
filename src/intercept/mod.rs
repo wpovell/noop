@@ -4,8 +4,9 @@ extern crate nix;
 use nix::libc::user_regs_struct as Regs;
 use nix::sys::ptrace;
 use nix::sys::ptrace::Options;
+use nix::sys::signal::{kill, Signal};
 use nix::sys::wait::waitpid;
-use nix::unistd::{execvp, fork, ForkResult, Pid};
+use nix::unistd::{execvp, fork, getpid, ForkResult, Pid};
 
 use std::ffi::CString;
 use std::fs;
@@ -13,27 +14,14 @@ use std::path::PathBuf;
 use std::process;
 
 use crate::args::Args;
-use crate::child;
 use crate::err::Result;
 use crate::types::{Action, OpenType};
 
-// Syscall numbers
-// TODO: Would be nice to wrap these in an enum somehow
-const SYS_OPEN: u64 = 2;
-const SYS_OPENAT: u64 = 257;
-const SYS_OPEN_BY_HANDLE_AT: u64 = 304;
-const SYS_EXIT: u64 = 60;
-const SYS_EXIT_GROUP: u64 = 231;
-
-/// Convert syscall number to string name
-fn sys_to_name(sys: u64) -> Option<&'static str> {
-    match sys {
-        SYS_OPEN => Some("open"),
-        SYS_OPENAT => Some("openat"),
-        SYS_OPEN_BY_HANDLE_AT => Some("open_by_handle_at"),
-        _ => None,
-    }
-}
+mod child;
+mod syscall;
+use self::syscall::Syscall;
+mod seccomp;
+use self::seccomp::Context;
 
 /// Parse child address holding a `CString` into a `PathBuf`
 ///
@@ -50,29 +38,23 @@ unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Rewrite `regs` to redirect `open` call to `new` path
+/// Rewrite `arg` to redirect `open` call to `new` path
 ///
 /// This function extends the child process stack, writes the new path,
-/// and updates the path argument in `regs` to point to this new value.
+/// and updates the path argument in `arg` to point to this new value.
 fn redirect_path(pid: Pid, stack: u64, arg: &mut u64, new: &PathBuf) -> Result<()> {
-    let mut path = CString::new(new.to_str()?.as_bytes())?.into_bytes_with_nul();
+    let mut path = CString::new(new.to_str()?
+                                .as_bytes())?.into_bytes_with_nul();
+
+    // Place string below 128B redzone
     let file_addr = stack - 128 - path.len() as u64;
-    *arg = file_addr;
 
     child::write_data(pid, file_addr, &mut path)?;
 
-    Ok(())
-}
+    // Update register
+    *arg = file_addr;
 
-/// Checks if path is allowed for given mode and returns action for it
-fn check_open(mode: &OpenType, rule: Option<&Action>) -> bool {
-    use crate::types::Action::*;
-    match rule {
-        Some(Block(OpenType::All)) => false,
-        Some(Block(typ)) => *mode == OpenType::All || *typ != *mode,
-        Some(Replace(_)) => true,
-        None => true,
-    }
+    Ok(())
 }
 
 /// Fork child to run passed program and begin tracing
@@ -81,6 +63,17 @@ fn trace_child(argv: &[CString]) -> Result<Pid> {
         ForkResult::Parent { child } => child,
         ForkResult::Child => {
             ptrace::traceme()?;
+
+            // Create seccomp filter
+            Context::new()
+                .trace(Syscall::Open as i32)
+                .trace(Syscall::OpenAt as i32)
+                .load();
+
+            // TODO: Is this necessary?
+            kill(getpid(), Signal::SIGSTOP)?;
+
+            // Execute program
             if execvp(&argv[0], argv).is_err() {
                 eprintln!("Failed to execute {:?}", argv[0]);
             }
@@ -91,9 +84,11 @@ fn trace_child(argv: &[CString]) -> Result<Pid> {
     // Sync with child traceme
     waitpid(pid, None)?;
 
-    // Kill child if we die
     let mut options = Options::empty();
+    // Kill child if we die
     options.insert(Options::PTRACE_O_EXITKILL);
+    // Catch seccomp filter
+    options.insert(Options::PTRACE_O_TRACESECCOMP);
     if ptrace::setoptions(pid, options).is_err() {
         eprintln!("Failed to trace child");
         process::exit(1);
@@ -104,30 +99,21 @@ fn trace_child(argv: &[CString]) -> Result<Pid> {
 
 /// Handle child call to `open`
 fn handle_open(pid: Pid, args: &Args, regs: &mut Regs) -> Result<()> {
-    let syscall = regs.orig_rax;
-
-    // Syscall name, address to path, opening mode
-    let (path_reg, flag_reg) = match syscall {
-        SYS_OPEN => (&mut regs.rdi, regs.rsi),
-        SYS_OPENAT => (&mut regs.rsi, regs.rdx),
-        SYS_OPEN_BY_HANDLE_AT => (&mut regs.rsi, regs.r8),
-        _ => panic!("Bad syscall passed to handle_open"),
-    };
+    let sys = Syscall::from(regs.orig_rax);
 
     // Read path from child
-    let path = unsafe { user_path(pid, *path_reg)? };
+    let path = unsafe { user_path(pid, *sys.path(regs))? };
 
     // Parse open mode from flag register
-    let mode = OpenType::from(flag_reg);
+    let mode = OpenType::from(sys.flag(regs));
 
     // Check if permitted
     let action = args.paths.get(&path);
-    let allowed = check_open(&mode, action);
+    let allowed = action.as_ref().map_or(true, |a| a.allows(&mode));
 
     if args.show {
         // Log open call
-        let name = sys_to_name(syscall).unwrap();
-        eprint!("{}({:?}, {})", name, path, mode);
+        eprint!("{}({:?}, {})", sys, path, mode);
 
         if !allowed {
             eprint!(" BLOCKED");
@@ -138,12 +124,8 @@ fn handle_open(pid: Pid, args: &Args, regs: &mut Regs) -> Result<()> {
     }
 
     if let Some(Action::Replace(new)) = action {
-        eprintln!("orig: {:?}", path);
         // Rewrite syscall path
-        redirect_path(pid, regs.rsp, path_reg, &new)?;
-
-        let new_path = unsafe { user_path(pid, *path_reg)? };
-        eprintln!("new: {:?}", new_path);
+        redirect_path(pid, regs.rsp, sys.path(regs), &new)?;
     }
 
     if !allowed {
@@ -161,25 +143,25 @@ pub fn start(args: &Args) -> Result<()> {
     // Fork off program
     let pid = trace_child(&args.argv)?;
 
+    let mut handled = 0;
     loop {
         // Syscall entrance
-        ptrace::syscall(pid)?;
-        waitpid(pid, None)?;
+        ptrace::cont(pid, None)?;
 
-        let mut regs = ptrace::getregs(pid)?;
-        let syscall = regs.orig_rax;
-
-        match syscall {
-            // Check if open is allowed
-            SYS_OPEN | SYS_OPENAT | SYS_OPEN_BY_HANDLE_AT => handle_open(pid, args, &mut regs)?,
-            // Child exited, we will also
-            SYS_EXIT | SYS_EXIT_GROUP => process::exit(regs.rdi as i32),
-            // Don't check non-open calls
+        use nix::sys::wait::WaitStatus::*;
+        match waitpid(pid, None)? {
+            Exited(_, code) => {
+                if args.show {
+                    eprintln!("\nSUMMARY:\n{} open calls handled", handled);
+                }
+                process::exit(code);
+            }
+            PtraceEvent(_, Signal::SIGTRAP, _) => {
+                handled += 1;
+                let mut regs = ptrace::getregs(pid)?;
+                handle_open(pid, args, &mut regs)?;
+            }
             _ => (),
-        };
-
-        // Syscall return
-        ptrace::syscall(pid)?;
-        waitpid(pid, None)?;
+        }
     }
 }

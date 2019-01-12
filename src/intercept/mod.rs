@@ -69,7 +69,7 @@ fn trace_child(argv: &[CString]) -> Result<Pid> {
                 .trace(Syscall::OpenAt as i32)?
                 .load()?;
 
-            // TODO: Is this necessary?
+            // Sync with tracer
             kill(getpid(), Signal::SIGSTOP)?;
 
             // Execute program

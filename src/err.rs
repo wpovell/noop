@@ -36,12 +36,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        // TODO: Fix this (although I don't think it matters)
-        None
-    }
-}
+impl error::Error for Error {}
 
 impl From<NulError> for Error {
     fn from(_err: NulError) -> Self {

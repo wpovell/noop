@@ -21,6 +21,7 @@ impl Context {
         }
     }
 
+    /// Add `seccomp` rule to trace syscall `call`
     pub fn trace(self, call: i32) -> Result<Self> {
         let ret = unsafe { seccomp_rule_add(self.ctx, SCMP_ACT_TRACE(0), call, 0) };
         if ret != 0 {
@@ -32,6 +33,7 @@ impl Context {
         }
     }
 
+    /// Load the created `seccomp` filter
     pub fn load(self) -> Result<()> {
         let ret = unsafe { seccomp_load(self.ctx) };
         if ret != 0 {
@@ -45,6 +47,7 @@ impl Context {
 }
 
 impl Drop for Context {
+    /// Release context on drop
     fn drop(&mut self) {
         unsafe { seccomp_release(self.ctx) };
     }

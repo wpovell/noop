@@ -16,6 +16,8 @@ pub enum Error {
     OS { err: Box<dyn error::Error> },
     /// Errors from unwrapping bad strings
     String { reason: &'static str },
+    /// Errors from seccomp
+    Seccomp { src: &'static str },
 }
 
 /// Crate `Result` type
@@ -29,6 +31,7 @@ impl fmt::Display for Error {
             Parse { err } => write!(f, "Parse: {}", err),
             OS { err } => write!(f, "OS: {}", err),
             String { reason } => write!(f, "String: {}", reason),
+            Seccomp { src } => write!(f, "Seccomp: {}", src),
         }
     }
 }

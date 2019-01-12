@@ -65,10 +65,10 @@ fn trace_child(argv: &[CString]) -> Result<Pid> {
             ptrace::traceme()?;
 
             // Create seccomp filter
-            Context::new()
-                .trace(Syscall::Open as i32)
-                .trace(Syscall::OpenAt as i32)
-                .load();
+            Context::new()?
+                .trace(Syscall::Open as i32)?
+                .trace(Syscall::OpenAt as i32)?
+                .load()?;
 
             // TODO: Is this necessary?
             kill(getpid(), Signal::SIGSTOP)?;

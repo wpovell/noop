@@ -20,18 +20,14 @@ fn find(b: &mut Bencher) {
 #[bench]
 fn noop_find(b: &mut Bencher) {
     b.iter(|| {
-        Command::new(TARGET)
-            .args(&["--", "find"])
-            .output().unwrap();
+        Command::new(TARGET).args(&["--", "find"]).output().unwrap();
     });
 }
 
 #[bench]
 fn cat(b: &mut Bencher) {
     b.iter(|| {
-        Command::new("cat")
-            .arg("Cargo.toml")
-            .output().unwrap();
+        Command::new("cat").arg("Cargo.toml").output().unwrap();
     });
 }
 
@@ -40,6 +36,7 @@ fn noop_cat(b: &mut Bencher) {
     b.iter(|| {
         Command::new(TARGET)
             .args(&["--", "cat", "Cargo.toml"])
-            .output().unwrap();
+            .output()
+            .unwrap();
     });
 }

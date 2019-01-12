@@ -1,7 +1,7 @@
 #![allow(non_upper_case_globals)]
 extern crate nix;
-use nix::libc::{SYS_open, SYS_openat};
 use nix::libc::user_regs_struct as Regs;
+use nix::libc::{SYS_open, SYS_openat};
 
 use std::fmt;
 

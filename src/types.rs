@@ -59,8 +59,7 @@ impl Action {
     pub fn allows(&self, mode: &OpenType) -> bool {
         match self {
             Action::Block(OpenType::All) => false,
-            Action::Block(typ) =>
-                *mode == OpenType::All || *typ != *mode,
+            Action::Block(typ) => *mode == OpenType::All || *typ != *mode,
             Action::Replace(_) => true,
         }
     }

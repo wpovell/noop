@@ -43,8 +43,7 @@ unsafe fn user_path(pid: Pid, addr: u64) -> Result<PathBuf> {
 /// This function extends the child process stack, writes the new path,
 /// and updates the path argument in `arg` to point to this new value.
 fn redirect_path(pid: Pid, stack: u64, arg: &mut u64, new: &PathBuf) -> Result<()> {
-    let mut path = CString::new(new.to_str()?
-                                .as_bytes())?.into_bytes_with_nul();
+    let mut path = CString::new(new.to_str()?.as_bytes())?.into_bytes_with_nul();
 
     // Place string below 128B redzone
     let file_addr = stack - 128 - path.len() as u64;

@@ -1,7 +1,7 @@
 extern crate seccomp_sys;
 use seccomp_sys::*;
 
-use crate::err::{Result, Error};
+use crate::err::{Error, Result};
 
 /// `seccomp` context to which rules are applied
 pub struct Context {
@@ -13,7 +13,9 @@ impl Context {
     pub fn new() -> Result<Self> {
         let ctx = unsafe { seccomp_init(SCMP_ACT_ALLOW) };
         if ctx.is_null() {
-            Err(Error::Seccomp { src: "seccomp_init returned null" })
+            Err(Error::Seccomp {
+                src: "seccomp_init returned null",
+            })
         } else {
             Ok(Context { ctx })
         }
@@ -22,7 +24,9 @@ impl Context {
     pub fn trace(self, call: i32) -> Result<Self> {
         let ret = unsafe { seccomp_rule_add(self.ctx, SCMP_ACT_TRACE(0), call, 0) };
         if ret != 0 {
-            Err(Error::Seccomp { src: "seccomp_rule_add returned error" })
+            Err(Error::Seccomp {
+                src: "seccomp_rule_add returned error",
+            })
         } else {
             Ok(self)
         }
@@ -31,7 +35,9 @@ impl Context {
     pub fn load(self) -> Result<()> {
         let ret = unsafe { seccomp_load(self.ctx) };
         if ret != 0 {
-            Err(Error::Seccomp { src: "seccomd_load returned error" })
+            Err(Error::Seccomp {
+                src: "seccomd_load returned error",
+            })
         } else {
             Ok(())
         }

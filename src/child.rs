@@ -52,11 +52,12 @@ pub fn write_data(pid: Pid, addr: u64, data: &mut Vec<u8>) -> Result<()> {
 
     let mut loc = addr;
     for chunk in data.chunks_mut(chunk_size) {
-        let mut chunk = NativeEndian::read_u64(chunk);
-        ptrace::write(pid, loc as AddressType, &mut chunk as *mut _ as *mut c_void)?;
+        let chunk = NativeEndian::read_u64(chunk);
+        ptrace::write(pid, loc as AddressType, chunk as *mut c_void)?;
 
         loc += chunk_size as u64;
     }
 
+    eprintln!("{:?}", String::from_utf8_lossy(&read_data(pid, addr, None)?));
     Ok(())
 }

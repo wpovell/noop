@@ -41,6 +41,9 @@ $ noop bar:w -- cat bar
 foo
 $ echo | noop bar:w -- tee bar
 tee: bar: Operation not permitted
+$ # Redirect
+$ noop wrong=bar -- cat wrong
+foo
 ```
 
 ## Building
@@ -67,7 +70,6 @@ Applications that fork aren't handled.
 
 ## TODO
 
-- Add file open redirection
 - Add recursive blocking
 - Add folder creation blocking
 - Add better command line argument handling

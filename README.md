@@ -54,7 +54,10 @@ The project relies on a recently landed PR of the `nix` crate so for now the dep
 
 ## Alternatives
 
-A major downside of this approach is that it intercepts every syscall, including ones that are not `open`. This has a significant performance penalty, similar to running a program under `strace`.
+There is some overhead of `noop`, mainly in handling every `open` call.
+`noop` uses `seccomp` with to avoid having to handle every syscall, however.
+
+See `cargo bench` for more empirical measure of performance.
 
 Some alternative ways to block the opening of a file:
 
